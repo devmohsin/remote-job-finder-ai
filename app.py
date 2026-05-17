@@ -53,7 +53,7 @@ with st.sidebar:
     )
 
     if api_key:
-        os.environ["ANTHROPIC_API_KEY"] = api_key
+        os.environ["GROQ_API_KEY"] = api_key
         st.success("✅ API Key set!")
 
     st.divider()
@@ -98,7 +98,7 @@ with st.sidebar:
 
 # ─── Session State ─────────────────────────────────────────────────────────────
 if "messages" not in st.session_state:
-    st.session_state.messages = []  # For Claude API
+    st.session_state.messages = []  # For AI API
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []  # For display
 if "cv_text" not in st.session_state:
@@ -134,8 +134,8 @@ user_input = st.chat_input("Type your message here... (e.g. 'Find me Python deve
 
 if user_input:
     # Check API key
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        st.error("⚠️ Please enter your Anthropic API Key in the sidebar to start chatting!")
+    if not os.environ.get("GROQ_API_KEY"):
+        st.error("⚠️ Please enter your API Key in the sidebar to start chatting!")
         st.stop()
 
     # If CV was uploaded, prepend it to the message
@@ -148,7 +148,7 @@ if user_input:
         st.markdown(user_input)
     st.session_state.chat_history.append({"role": "user", "content": user_input})
 
-    # Add to Claude messages
+    # Add to messages
     st.session_state.messages.append({"role": "user", "content": full_input})
 
     # Get AI response

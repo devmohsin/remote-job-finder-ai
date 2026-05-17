@@ -1,9 +1,13 @@
 import json
-import anthropic
+import os
+from groq import Groq
 from tools import search_remote_jobs, search_remoteok_jobs, review_cv, write_cover_letter, get_job_categories
 
-# Initialize AI client
-client = anthropic.Anthropic()
+# Initialize Groq client
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+
+# Model to use (free on Groq)
+MODEL = "llama-3.3-70b-versatile"
 
 # System prompt
 SYSTEM_PROMPT = """You are RemoteJobBot, a helpful AI assistant that specializes in helping people find remote jobs worldwide.
@@ -33,97 +37,109 @@ When reviewing CVs:
 
 Always respond in a friendly, conversational tone. Use emojis occasionally to keep things engaging. 🚀"""
 
-# Define tools for Claude
+# Define tools (Groq uses OpenAI-compatible format)
 TOOLS = [
     {
-        "name": "search_remote_jobs",
-        "description": "Search for remote job listings using keywords. Use this when the user wants to find remote jobs. Returns job title, company, salary, location, and apply link.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "keywords": {
-                    "type": "string",
-                    "description": "Job search keywords e.g. 'python developer', 'graphic designer', 'customer support'"
+        "type": "function",
+        "function": {
+            "name": "search_remote_jobs",
+            "description": "Search for remote job listings using keywords. Use this when the user wants to find remote jobs. Returns job title, company, salary, location, and apply link.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "keywords": {
+                        "type": "string",
+                        "description": "Job search keywords e.g. 'python developer', 'graphic designer', 'customer support'"
+                    },
+                    "category": {
+                        "type": "string",
+                        "description": "Job category filter (optional) e.g. 'software-dev', 'design', 'marketing'"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Number of jobs to return (default 5, max 10)"
+                    }
                 },
-                "category": {
-                    "type": "string",
-                    "description": "Job category filter (optional) e.g. 'software-dev', 'design', 'marketing'"
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "Number of jobs to return (default 5, max 10)",
-                    "default": 5
-                }
-            },
-            "required": ["keywords"]
+                "required": ["keywords"]
+            }
         }
     },
     {
-        "name": "search_remoteok_jobs",
-        "description": "Search RemoteOK platform for remote jobs by tag/skill. Good for tech and developer jobs.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "tag": {
-                    "type": "string",
-                    "description": "Skill or technology tag e.g. 'python', 'react', 'design', 'marketing'"
+        "type": "function",
+        "function": {
+            "name": "search_remoteok_jobs",
+            "description": "Search RemoteOK platform for remote jobs by tag/skill. Good for tech and developer jobs.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "tag": {
+                        "type": "string",
+                        "description": "Skill or technology tag e.g. 'python', 'react', 'design', 'marketing'"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Number of jobs to return (default 5)"
+                    }
                 },
-                "limit": {
-                    "type": "integer",
-                    "description": "Number of jobs to return (default 5)",
-                    "default": 5
-                }
-            },
-            "required": ["tag"]
+                "required": ["tag"]
+            }
         }
     },
     {
-        "name": "review_cv",
-        "description": "Review and analyze a user's CV/Resume text. Gives a score, identifies issues, and provides improvement suggestions.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "cv_text": {
-                    "type": "string",
-                    "description": "The full text content of the user's CV/Resume"
-                }
-            },
-            "required": ["cv_text"]
+        "type": "function",
+        "function": {
+            "name": "review_cv",
+            "description": "Review and analyze a user's CV/Resume text. Gives a score, identifies issues, and provides improvement suggestions.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "cv_text": {
+                        "type": "string",
+                        "description": "The full text content of the user's CV/Resume"
+                    }
+                },
+                "required": ["cv_text"]
+            }
         }
     },
     {
-        "name": "write_cover_letter",
-        "description": "Write a professional cover letter for a specific job application.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "job_title": {
-                    "type": "string",
-                    "description": "The job title they are applying for"
+        "type": "function",
+        "function": {
+            "name": "write_cover_letter",
+            "description": "Write a professional cover letter for a specific job application.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "job_title": {
+                        "type": "string",
+                        "description": "The job title they are applying for"
+                    },
+                    "company_name": {
+                        "type": "string",
+                        "description": "The name of the company"
+                    },
+                    "candidate_skills": {
+                        "type": "string",
+                        "description": "The candidate's main skills and expertise"
+                    },
+                    "years_experience": {
+                        "type": "string",
+                        "description": "Years of experience e.g. '3 years', '5+ years'"
+                    }
                 },
-                "company_name": {
-                    "type": "string",
-                    "description": "The name of the company"
-                },
-                "candidate_skills": {
-                    "type": "string",
-                    "description": "The candidate's main skills and expertise"
-                },
-                "years_experience": {
-                    "type": "string",
-                    "description": "Years of experience e.g. '3 years', '5+ years'"
-                }
-            },
-            "required": ["job_title", "company_name", "candidate_skills", "years_experience"]
+                "required": ["job_title", "company_name", "candidate_skills", "years_experience"]
+            }
         }
     },
     {
-        "name": "get_job_categories",
-        "description": "Get a list of popular remote job categories. Use this when the user is unsure what category to search in.",
-        "input_schema": {
-            "type": "object",
-            "properties": {},
-            "required": []
+        "type": "function",
+        "function": {
+            "name": "get_job_categories",
+            "description": "Get a list of popular remote job categories. Use this when the user is unsure what category to search in.",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
         }
     }
 ]
@@ -155,40 +171,57 @@ def run_agent(messages: list) -> str:
     Run the AI agent with the agentic loop
     Returns the final text response
     """
+    # Add system message at the start
+    full_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
+
     while True:
-        # Call Claude API
-        response = client.messages.create(
-            model="claude-opus-4-5",
-            max_tokens=2048,
-            system=SYSTEM_PROMPT,
+        # Call Groq API
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=full_messages,
             tools=TOOLS,
-            messages=messages
+            tool_choice="auto",
+            max_tokens=2048
         )
 
-        # Check if Claude wants to use a tool
-        if response.stop_reason == "tool_use":
-            # Add Claude's response to messages
-            messages.append({"role": "assistant", "content": response.content})
+        message = response.choices[0].message
+        finish_reason = response.choices[0].finish_reason
 
-            # Process all tool calls
-            tool_results = []
-            for block in response.content:
-                if block.type == "tool_use":
-                    # Execute the tool
-                    tool_result = execute_tool(block.name, block.input)
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": tool_result
-                    })
+        # Check if model wants to use a tool
+        if finish_reason == "tool_calls" and message.tool_calls:
 
-            # Add tool results to messages
-            messages.append({"role": "user", "content": tool_results})
+            # Add assistant message with tool calls to history
+            full_messages.append({
+                "role": "assistant",
+                "content": message.content or "",
+                "tool_calls": [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments
+                        }
+                    }
+                    for tc in message.tool_calls
+                ]
+            })
+
+            # Execute each tool call
+            for tool_call in message.tool_calls:
+                tool_name = tool_call.function.name
+                tool_input = json.loads(tool_call.function.arguments)
+
+                # Run the tool
+                tool_result = execute_tool(tool_name, tool_input)
+
+                # Add tool result to messages
+                full_messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": tool_result
+                })
 
         else:
-            # Claude is done — extract final text response
-            final_text = ""
-            for block in response.content:
-                if hasattr(block, "text"):
-                    final_text += block.text
-            return final_text
+            # Agent is done — return final response
+            return message.content or "Sorry, I could not generate a response. Please try again."
