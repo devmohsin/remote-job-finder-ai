@@ -8,8 +8,11 @@ load_dotenv()
 
 # ─── Load API Key Automatically (Hidden from users) ───────────────────────────
 # Try Streamlit secrets first (cloud), then fall back to .env (local)
-if "GROQ_API_KEY" in st.secrets:
-    os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
+try:
+    if "GROQ_API_KEY" in st.secrets:
+        os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
+except Exception:
+    pass  # Running locally, key loaded from .env
 
 # ─── Page Configuration ───────────────────────────────────────────────────────
 st.set_page_config(
@@ -154,4 +157,4 @@ if user_input:
                 st.session_state.messages.append({"role": "assistant", "content": response})
 
             except Exception as e:
-                st.error("❌ Something went wrong. Please try again.")
+                st.error(f"❌ Error: {str(e)}")
