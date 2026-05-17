@@ -1,9 +1,15 @@
 import streamlit as st
 import os
 import io
-import PyPDF2
 from dotenv import load_dotenv
 from agent import run_agent
+
+# Safe import for pdfplumber
+try:
+    import pdfplumber
+    PDF_SUPPORTED = True
+except ImportError:
+    PDF_SUPPORTED = False
 
 # Safe import for docx
 try:
@@ -22,10 +28,15 @@ def extract_text_from_file(uploaded_file) -> str:
 
     try:
         if file_type == "pdf":
-            reader = PyPDF2.PdfReader(io.BytesIO(uploaded_file.read()))
+            if not PDF_SUPPORTED:
+                return ""
+            file_bytes = io.BytesIO(uploaded_file.read())
             text = ""
-            for page in reader.pages:
-                text += page.extract_text() + "\n"
+            with pdfplumber.open(file_bytes) as pdf:
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + "\n"
             return text.strip()
 
         elif file_type == "docx":
@@ -126,9 +137,11 @@ with st.sidebar:
             st.warning("⚠️ Word format not available. Please upload PDF or TXT.")
         elif cv_text:
             st.session_state.cv_text = cv_text
-            st.success("✅ CV uploaded! Ask me to review it.")
+            st.success(f"✅ CV read successfully! ({len(cv_text.split())} words extracted)")
+            with st.expander("👁️ Preview extracted text"):
+                st.text(cv_text[:500] + "..." if len(cv_text) > 500 else cv_text)
         else:
-            st.error("❌ Could not read the file. Please try PDF or TXT format.")
+            st.error("❌ Could not read the file. Please try a different PDF or TXT format.")
 
     # Clear chat button
     if st.button("🗑️ Clear Chat", use_container_width=True):
