@@ -131,17 +131,22 @@ with st.sidebar:
         help="Supports PDF, Word (.docx) and plain text files"
     )
     if uploaded_cv:
-        with st.spinner("Reading your CV..."):
-            cv_text = extract_text_from_file(uploaded_cv)
-        if cv_text == "DOCX_NOT_SUPPORTED":
-            st.warning("⚠️ Word format not available. Please upload PDF or TXT.")
-        elif cv_text:
-            st.session_state.cv_text = cv_text
-            st.success(f"✅ CV read successfully! ({len(cv_text.split())} words extracted)")
-            with st.expander("👁️ Preview extracted text"):
-                st.text(cv_text[:500] + "..." if len(cv_text) > 500 else cv_text)
+        # Check file size (max 10MB)
+        file_size_mb = uploaded_cv.size / (1024 * 1024)
+        if file_size_mb > 10:
+            st.error(f"❌ File too large ({file_size_mb:.1f}MB). Please upload a file under 10MB.")
         else:
-            st.error("❌ Could not read the file. Please try a different PDF or TXT format.")
+            with st.spinner("Reading your CV..."):
+                cv_text = extract_text_from_file(uploaded_cv)
+            if cv_text == "DOCX_NOT_SUPPORTED":
+                st.warning("⚠️ Word format not available. Please upload PDF or TXT.")
+            elif cv_text:
+                st.session_state.cv_text = cv_text
+                st.success(f"✅ CV read successfully! ({len(cv_text.split())} words extracted)")
+                with st.expander("👁️ Preview extracted text"):
+                    st.text(cv_text[:500] + "..." if len(cv_text) > 500 else cv_text)
+            else:
+                st.error("❌ Could not read the file. Please try a different PDF or TXT format.")
 
     # Clear chat button
     if st.button("🗑️ Clear Chat", use_container_width=True):
