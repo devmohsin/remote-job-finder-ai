@@ -1,10 +1,16 @@
 import streamlit as st
 import os
-import PyPDF2
-import docx
 import io
+import PyPDF2
 from dotenv import load_dotenv
 from agent import run_agent
+
+# Safe import for docx
+try:
+    import docx
+    DOCX_SUPPORTED = True
+except ImportError:
+    DOCX_SUPPORTED = False
 
 # Load environment variables (.env for local, Streamlit secrets for cloud)
 load_dotenv()
@@ -23,6 +29,8 @@ def extract_text_from_file(uploaded_file) -> str:
             return text.strip()
 
         elif file_type == "docx":
+            if not DOCX_SUPPORTED:
+                return "DOCX_NOT_SUPPORTED"
             doc = docx.Document(io.BytesIO(uploaded_file.read()))
             text = "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
             return text.strip()
@@ -33,7 +41,7 @@ def extract_text_from_file(uploaded_file) -> str:
         else:
             return ""
 
-    except Exception as e:
+    except Exception:
         return ""
 
 # ─── Load API Key Automatically (Hidden from users) ───────────────────────────
@@ -114,11 +122,13 @@ with st.sidebar:
     if uploaded_cv:
         with st.spinner("Reading your CV..."):
             cv_text = extract_text_from_file(uploaded_cv)
-        if cv_text:
+        if cv_text == "DOCX_NOT_SUPPORTED":
+            st.warning("⚠️ Word format not available. Please upload PDF or TXT.")
+        elif cv_text:
             st.session_state.cv_text = cv_text
             st.success("✅ CV uploaded! Ask me to review it.")
         else:
-            st.error("❌ Could not read the file. Please try a different format.")
+            st.error("❌ Could not read the file. Please try PDF or TXT format.")
 
     # Clear chat button
     if st.button("🗑️ Clear Chat", use_container_width=True):
