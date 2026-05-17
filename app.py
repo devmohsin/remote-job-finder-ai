@@ -3,8 +3,13 @@ import os
 from dotenv import load_dotenv
 from agent import run_agent
 
-# Load environment variables
+# Load environment variables (.env for local, Streamlit secrets for cloud)
 load_dotenv()
+
+# ─── Load API Key Automatically (Hidden from users) ───────────────────────────
+# Try Streamlit secrets first (cloud), then fall back to .env (local)
+if "GROQ_API_KEY" in st.secrets:
+    os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 
 # ─── Page Configuration ───────────────────────────────────────────────────────
 st.set_page_config(
@@ -42,22 +47,6 @@ st.markdown("""
 
 # ─── Sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.header("⚙️ Settings")
-
-    # API Key input
-    api_key = st.text_input(
-        "AI API Key",
-        type="password",
-        placeholder="Enter your API key...",
-        help="Enter your API key to activate the agent"
-    )
-
-    if api_key:
-        os.environ["GROQ_API_KEY"] = api_key
-        st.success("✅ API Key set!")
-
-    st.divider()
-
     st.header("🚀 What I Can Do")
     features = [
         "🔍 Search remote jobs worldwide",
@@ -98,9 +87,9 @@ with st.sidebar:
 
 # ─── Session State ─────────────────────────────────────────────────────────────
 if "messages" not in st.session_state:
-    st.session_state.messages = []  # For AI API
+    st.session_state.messages = []
 if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []  # For display
+    st.session_state.chat_history = []
 if "cv_text" not in st.session_state:
     st.session_state.cv_text = None
 
@@ -133,9 +122,9 @@ for chat in st.session_state.chat_history:
 user_input = st.chat_input("Type your message here... (e.g. 'Find me Python developer jobs')")
 
 if user_input:
-    # Check API key
+    # Check API key is configured (only shown to developer, not users)
     if not os.environ.get("GROQ_API_KEY"):
-        st.error("⚠️ Please enter your API Key in the sidebar to start chatting!")
+        st.error("⚠️ Service is currently unavailable. Please try again later.")
         st.stop()
 
     # If CV was uploaded, prepend it to the message
@@ -165,5 +154,4 @@ if user_input:
                 st.session_state.messages.append({"role": "assistant", "content": response})
 
             except Exception as e:
-                error_msg = f"❌ Error: {str(e)}\n\nPlease check your API key and try again."
-                st.error(error_msg)
+                st.error("❌ Something went wrong. Please try again.")
