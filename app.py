@@ -196,10 +196,17 @@ if user_input:
         st.error("⚠️ Service is currently unavailable. Please try again later.")
         st.stop()
 
-    # If CV was uploaded, prepend it to the message
+    # If CV was uploaded, always attach it so agent can reference it anytime
     full_input = user_input
-    if st.session_state.cv_text and "review" in user_input.lower() and "cv" in user_input.lower():
-        full_input = f"{user_input}\n\nHere is my CV:\n{st.session_state.cv_text}"
+    if st.session_state.cv_text:
+        cv_keywords = [
+            "cv", "resume", "review", "check", "improve", "analyze",
+            "analyse", "feedback", "suggest", "look at", "read", "fix",
+            "update", "score", "rate", "help", "better", "profile"
+        ]
+        user_lower = user_input.lower()
+        if any(word in user_lower for word in cv_keywords):
+            full_input = f"{user_input}\n\n[Attached CV/Resume:]\n{st.session_state.cv_text}"
 
     # Display user message
     with st.chat_message("user"):
