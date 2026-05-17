@@ -1,7 +1,7 @@
 import json
 import os
 from groq import Groq
-from tools import search_remote_jobs, search_remoteok_jobs, review_cv, write_cover_letter, get_job_categories
+from tools import search_remote_jobs, search_remoteok_jobs, review_cv, write_cover_letter, get_job_categories, create_pdf
 
 # Model to use (free on Groq)
 MODEL = "llama-3.3-70b-versatile"
@@ -152,6 +152,31 @@ TOOLS = [
                 "properties": {}
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_pdf",
+            "description": "Create and generate a downloadable PDF file with any content. Use this whenever the user asks to create a PDF, generate a PDF, download something as PDF, or save content to PDF.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description": "The title of the PDF document e.g. 'Cover Letter', 'CV Review', 'Hello World'"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "The full content/body text to include in the PDF"
+                    },
+                    "filename": {
+                        "type": "string",
+                        "description": "The filename for the PDF e.g. 'cover_letter.pdf', 'hello_world.pdf'"
+                    }
+                },
+                "required": ["title", "content"]
+            }
+        }
     }
 ]
 
@@ -169,6 +194,8 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             result = write_cover_letter(**tool_input)
         elif tool_name == "get_job_categories":
             result = get_job_categories()
+        elif tool_name == "create_pdf":
+            result = create_pdf(**tool_input)
         else:
             result = {"success": False, "message": f"Unknown tool: {tool_name}"}
 

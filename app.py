@@ -4,6 +4,7 @@ import io
 from dotenv import load_dotenv
 from agent import run_agent
 from pdf_generator import generate_pdf
+import shared_state
 
 # Safe import for pdfplumber
 try:
@@ -227,31 +228,18 @@ if user_input:
                 st.markdown(response)
 
                 # ── PDF Download Button ──────────────────────────
-                pdf_keywords = [
-                    "cover letter", "dear hiring", "cv review",
-                    "score", "suggestions", "improvements", "resume review"
-                ]
-                response_lower = response.lower()
-                if any(kw in response_lower for kw in pdf_keywords):
-                    # Detect title
-                    if "cover letter" in response_lower or "dear hiring" in response_lower:
-                        pdf_title = "Cover Letter"
-                        file_name = "cover_letter.pdf"
-                    else:
-                        pdf_title = "CV Review Report"
-                        file_name = "cv_review.pdf"
-
-                    try:
-                        pdf_bytes = generate_pdf(pdf_title, response)
-                        st.download_button(
-                            label="📥 Download as PDF",
-                            data=pdf_bytes,
-                            file_name=file_name,
-                            mime="application/pdf",
-                            use_container_width=True
-                        )
-                    except Exception:
-                        pass  # Don't break app if PDF generation fails
+                # Check if agent created a PDF via create_pdf tool
+                if shared_state.pdf_buffer:
+                    st.download_button(
+                        label="📥 Download PDF",
+                        data=shared_state.pdf_buffer,
+                        file_name=shared_state.pdf_filename,
+                        mime="application/pdf",
+                        use_container_width=True
+                    )
+                    # Reset after showing
+                    shared_state.pdf_buffer = None
+                    shared_state.pdf_filename = "document.pdf"
 
                 # Save to history
                 st.session_state.chat_history.append({"role": "assistant", "content": response})

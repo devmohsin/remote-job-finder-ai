@@ -1,4 +1,6 @@
 import requests
+import shared_state
+from pdf_generator import generate_pdf
 
 
 def search_remote_jobs(keywords: str, category: str = "", limit: int = 5) -> dict:
@@ -187,3 +189,24 @@ def get_job_categories() -> dict:
             "Product Management"
         ]
     }
+
+
+def create_pdf(title: str, content: str, filename: str = "document.pdf") -> dict:
+    """
+    Create a PDF file from given title and content.
+    Use this whenever user asks to create, generate or download a PDF.
+    """
+    try:
+        pdf_bytes = generate_pdf(title, content)
+        # Store in shared state so app.py can show download button
+        shared_state.pdf_buffer = pdf_bytes
+        shared_state.pdf_filename = filename if filename.endswith(".pdf") else filename + ".pdf"
+        return {
+            "success": True,
+            "message": f"PDF '{shared_state.pdf_filename}' has been created successfully! The download button will appear below."
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Failed to create PDF: {str(e)}"
+        }
