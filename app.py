@@ -46,10 +46,10 @@ with st.sidebar:
 
     # API Key input
     api_key = st.text_input(
-        "Anthropic API Key",
+        "AI API Key",
         type="password",
-        placeholder="sk-ant-...",
-        help="Get your key from console.anthropic.com"
+        placeholder="Enter your API key...",
+        help="Enter your API key to activate the agent"
     )
 
     if api_key:

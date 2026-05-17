@@ -1,6 +1,6 @@
 # 🌍 Remote Job Finder AI Agent
 
-An AI-powered agent built with **Claude API** and **Streamlit** that helps people find remote jobs worldwide, review CVs, and write cover letters.
+An AI-powered agent built with **Python** and **Streamlit** that helps people find remote jobs worldwide, review CVs, and write cover letters.
 
 ---
 
@@ -19,7 +19,7 @@ An AI-powered agent built with **Claude API** and **Streamlit** that helps peopl
 | Tool | Purpose |
 |------|---------|
 | Python | Core language |
-| Claude API (Anthropic) | AI brain |
+| AI API | AI brain |
 | Streamlit | Web interface |
 | Remotive API | Job listings (free) |
 | RemoteOK API | Job listings (free) |
@@ -42,7 +42,7 @@ pip install -r requirements.txt
 ### 3. Set up your API key
 ```bash
 cp .env.example .env
-# Edit .env and add your Anthropic API key
+# Edit .env and add your API key
 ```
 
 ### 4. Run the app
@@ -80,7 +80,7 @@ Agent: Generates a professional, personalized cover letter instantly
 ```
 Agent/
 ├── app.py          # Streamlit frontend
-├── agent.py        # Claude AI agent + agentic loop
+├── agent.py        # AI agent + agentic loop
 ├── tools.py        # Job search & CV tools
 ├── requirements.txt
 ├── .env.example    # API key template
@@ -94,7 +94,7 @@ Agent/
 
 | API | Required | Cost | Link |
 |-----|----------|------|------|
-| Anthropic | ✅ Yes | Pay per use | [console.anthropic.com](https://console.anthropic.com) |
+| AI API Key | ✅ Yes | Pay per use | Set in `.env` file |
 | Remotive | ❌ No | Free | Auto |
 | RemoteOK | ❌ No | Free | Auto |
 
@@ -109,4 +109,4 @@ Agent/
 
 ---
 
-Built with ❤️ using Claude AI
+Built with ❤️ by devmohsin

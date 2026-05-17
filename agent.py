@@ -2,10 +2,10 @@ import json
 import anthropic
 from tools import search_remote_jobs, search_remoteok_jobs, review_cv, write_cover_letter, get_job_categories
 
-# Initialize Anthropic client
+# Initialize AI client
 client = anthropic.Anthropic()
 
-# System prompt for the agent
+# System prompt
 SYSTEM_PROMPT = """You are RemoteJobBot, a helpful AI assistant that specializes in helping people find remote jobs worldwide.
 
 You help users with:
