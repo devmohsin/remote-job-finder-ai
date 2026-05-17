@@ -3,9 +3,6 @@ import os
 from groq import Groq
 from tools import search_remote_jobs, search_remoteok_jobs, review_cv, write_cover_letter, get_job_categories
 
-# Initialize Groq client
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
-
 # Model to use (free on Groq)
 MODEL = "llama-3.3-70b-versatile"
 
@@ -171,6 +168,9 @@ def run_agent(messages: list) -> str:
     Run the AI agent with the agentic loop
     Returns the final text response
     """
+    # Initialize client here so it picks up the API key at runtime
+    client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+
     # Add system message at the start
     full_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
 
