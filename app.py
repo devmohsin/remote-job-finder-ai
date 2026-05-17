@@ -1,10 +1,40 @@
 import streamlit as st
 import os
+import PyPDF2
+import docx
+import io
 from dotenv import load_dotenv
 from agent import run_agent
 
 # Load environment variables (.env for local, Streamlit secrets for cloud)
 load_dotenv()
+
+# ─── CV Text Extraction ───────────────────────────────────────────────────────
+def extract_text_from_file(uploaded_file) -> str:
+    """Extract text from PDF, DOCX or TXT file"""
+    file_type = uploaded_file.name.split(".")[-1].lower()
+
+    try:
+        if file_type == "pdf":
+            reader = PyPDF2.PdfReader(io.BytesIO(uploaded_file.read()))
+            text = ""
+            for page in reader.pages:
+                text += page.extract_text() + "\n"
+            return text.strip()
+
+        elif file_type == "docx":
+            doc = docx.Document(io.BytesIO(uploaded_file.read()))
+            text = "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
+            return text.strip()
+
+        elif file_type == "txt":
+            return uploaded_file.read().decode("utf-8").strip()
+
+        else:
+            return ""
+
+    except Exception as e:
+        return ""
 
 # ─── Load API Key Automatically (Hidden from users) ───────────────────────────
 # Try Streamlit secrets first (cloud), then fall back to .env (local)
@@ -76,11 +106,19 @@ with st.sidebar:
 
     # CV Upload
     st.header("📄 Upload Your CV")
-    uploaded_cv = st.file_uploader("Upload CV (TXT format)", type=["txt"])
+    uploaded_cv = st.file_uploader(
+        "Upload CV (PDF, Word or TXT)",
+        type=["pdf", "docx", "txt"],
+        help="Supports PDF, Word (.docx) and plain text files"
+    )
     if uploaded_cv:
-        cv_text = uploaded_cv.read().decode("utf-8")
-        st.session_state.cv_text = cv_text
-        st.success("✅ CV uploaded! Ask me to review it.")
+        with st.spinner("Reading your CV..."):
+            cv_text = extract_text_from_file(uploaded_cv)
+        if cv_text:
+            st.session_state.cv_text = cv_text
+            st.success("✅ CV uploaded! Ask me to review it.")
+        else:
+            st.error("❌ Could not read the file. Please try a different format.")
 
     # Clear chat button
     if st.button("🗑️ Clear Chat", use_container_width=True):
