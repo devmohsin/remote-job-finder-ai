@@ -3,8 +3,6 @@ import os
 import io
 from dotenv import load_dotenv
 from agent import run_agent
-from pdf_generator import generate_pdf
-import shared_state
 
 # Safe import for pdfplumber
 try:
@@ -222,24 +220,20 @@ if user_input:
     with st.chat_message("assistant"):
         with st.spinner("🔍 Searching for the best opportunities..."):
             try:
-                response = run_agent(st.session_state.messages)
+                response, pdf_bytes, pdf_filename = run_agent(st.session_state.messages)
 
                 # Display response
                 st.markdown(response)
 
                 # ── PDF Download Button ──────────────────────────
-                # Check if agent created a PDF via create_pdf tool
-                if shared_state.pdf_buffer:
+                if pdf_bytes:
                     st.download_button(
                         label="📥 Download PDF",
-                        data=shared_state.pdf_buffer,
-                        file_name=shared_state.pdf_filename,
+                        data=pdf_bytes,
+                        file_name=pdf_filename,
                         mime="application/pdf",
                         use_container_width=True
                     )
-                    # Reset after showing
-                    shared_state.pdf_buffer = None
-                    shared_state.pdf_filename = "document.pdf"
 
                 # Save to history
                 st.session_state.chat_history.append({"role": "assistant", "content": response})

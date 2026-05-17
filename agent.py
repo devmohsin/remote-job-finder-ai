@@ -1,7 +1,8 @@
 import json
 import os
 from groq import Groq
-from tools import search_remote_jobs, search_remoteok_jobs, review_cv, write_cover_letter, get_job_categories, create_pdf
+from pdf_generator import generate_pdf
+from tools import search_remote_jobs, search_remoteok_jobs, review_cv, write_cover_letter, get_job_categories
 
 # Model to use (free on Groq)
 MODEL = "llama-3.3-70b-versatile"
@@ -181,7 +182,7 @@ TOOLS = [
 ]
 
 
-def execute_tool(tool_name: str, tool_input: dict) -> str:
+def execute_tool(tool_name: str, tool_input: dict, pdf_store: dict) -> str:
     """Execute the requested tool and return result as string"""
     try:
         if tool_name == "search_remote_jobs":
@@ -195,7 +196,19 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
         elif tool_name == "get_job_categories":
             result = get_job_categories()
         elif tool_name == "create_pdf":
-            result = create_pdf(**tool_input)
+            # Generate PDF and store bytes directly in pdf_store dict
+            try:
+                title    = tool_input.get("title", "Document")
+                content  = tool_input.get("content", "")
+                filename = tool_input.get("filename", "document.pdf")
+                if not filename.endswith(".pdf"):
+                    filename += ".pdf"
+                pdf_bytes = generate_pdf(title, content)
+                pdf_store["bytes"]    = pdf_bytes
+                pdf_store["filename"] = filename
+                result = {"success": True, "message": f"PDF '{filename}' created! Download button will appear below."}
+            except Exception as e:
+                result = {"success": False, "message": f"PDF creation failed: {str(e)}"}
         else:
             result = {"success": False, "message": f"Unknown tool: {tool_name}"}
 
@@ -204,13 +217,16 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
         return json.dumps({"success": False, "message": f"Tool error: {str(e)}"})
 
 
-def run_agent(messages: list) -> str:
+def run_agent(messages: list) -> tuple:
     """
     Run the AI agent with the agentic loop
-    Returns the final text response
+    Returns (text_response, pdf_bytes, pdf_filename)
     """
     # Initialize client here so it picks up the API key at runtime
     client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+
+    # PDF store — passed into execute_tool so it can store PDF bytes directly
+    pdf_store = {"bytes": None, "filename": "document.pdf"}
 
     # Add system message at the start
     full_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
@@ -250,11 +266,11 @@ def run_agent(messages: list) -> str:
 
             # Execute each tool call
             for tool_call in message.tool_calls:
-                tool_name = tool_call.function.name
+                tool_name  = tool_call.function.name
                 tool_input = json.loads(tool_call.function.arguments)
 
-                # Run the tool
-                tool_result = execute_tool(tool_name, tool_input)
+                # Run the tool (pass pdf_store so create_pdf can fill it)
+                tool_result = execute_tool(tool_name, tool_input, pdf_store)
 
                 # Add tool result to messages
                 full_messages.append({
@@ -264,5 +280,6 @@ def run_agent(messages: list) -> str:
                 })
 
         else:
-            # Agent is done — return final response
-            return message.content or "Sorry, I could not generate a response. Please try again."
+            # Agent is done — return text + any PDF that was generated
+            text = message.content or "Sorry, I could not generate a response. Please try again."
+            return text, pdf_store["bytes"], pdf_store["filename"]
