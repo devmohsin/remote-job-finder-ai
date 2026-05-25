@@ -71,23 +71,6 @@ TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "search_remoteok_jobs",
-            "description": "Search RemoteOK platform for remote jobs by tag/skill. Good for tech and developer jobs. Always returns 5 results.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "tag": {
-                        "type": "string",
-                        "description": "Skill or technology tag e.g. 'python', 'react', 'design', 'marketing'"
-                    }
-                },
-                "required": ["tag"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "review_cv",
             "description": "Review and analyze a user's CV/Resume text. Gives a score, identifies issues, and provides improvement suggestions.",
             "parameters": {
@@ -176,7 +159,9 @@ def execute_tool(tool_name: str, tool_input: dict, pdf_store: dict) -> str:
         if tool_name == "search_remote_jobs":
             result = search_remote_jobs(**tool_input)
         elif tool_name == "search_remoteok_jobs":
-            result = search_remoteok_jobs(**tool_input)
+            # Fallback: use search_remote_jobs with tag as keyword
+            keywords = tool_input.get("tag", tool_input.get("keywords", "remote jobs"))
+            result = search_remote_jobs(keywords=keywords)
         elif tool_name == "review_cv":
             result = review_cv(**tool_input)
         elif tool_name == "write_cover_letter":
@@ -226,7 +211,8 @@ def run_agent(messages: list) -> tuple:
             messages=full_messages,
             tools=TOOLS,
             tool_choice="auto",
-            max_tokens=2048
+            max_tokens=2048,
+            parallel_tool_calls=False
         )
 
         message = response.choices[0].message
