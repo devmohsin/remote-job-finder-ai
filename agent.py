@@ -55,17 +55,13 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "search_remote_jobs",
-            "description": "Search for remote job listings using keywords. Use this when the user wants to find remote jobs. Returns job title, company, salary, location, and apply link. Always returns 5 results.",
+            "description": "Search for remote job listings using keywords. Use this when the user wants to find remote jobs. Returns job title, company, salary, location, and apply link.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "keywords": {
                         "type": "string",
-                        "description": "Job search keywords e.g. 'python developer', 'graphic designer', 'customer support'"
-                    },
-                    "category": {
-                        "type": "string",
-                        "description": "Job category filter (optional) e.g. 'software-dev', 'design', 'marketing'"
+                        "description": "Job search keywords e.g. 'wordpress developer', 'graphic designer', 'customer support'"
                     }
                 },
                 "required": ["keywords"]

@@ -194,7 +194,7 @@ Let's get you hired! 🚀
             st.markdown(chat["content"])
 
     # Chat input
-    user_input = st.chat_input("Type here... e.g. 'Find Python developer jobs'")
+    user_input = st.chat_input("Type here... e.g. 'Find Python developer jobs'", key="job_finder_input")
 
     if user_input:
         if not os.environ.get("GROQ_API_KEY"):
@@ -364,7 +364,7 @@ with tab2:
 
             # Answer input
             if not st.session_state.interview_finished:
-                answer = st.chat_input("Type your answer here...")
+                answer = st.chat_input("Type your answer here...", key="interview_input")
 
                 if answer:
                     if not os.environ.get("GROQ_API_KEY"):

@@ -3,16 +3,14 @@ import shared_state
 from pdf_generator import generate_pdf
 
 
-def search_remote_jobs(keywords: str, category: str = "", limit: int = 5) -> dict:
+def search_remote_jobs(keywords: str, limit: int = 5) -> dict:
     """
     Search remote jobs using Remotive API (Free, no API key needed)
     """
     try:
-        limit = int(limit)  # Force to int in case AI passes a string
+        limit = int(limit)
         url = "https://remotive.com/api/remote-jobs"
         params = {"search": keywords, "limit": limit}
-        if category:
-            params["category"] = category
 
         response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
