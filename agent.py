@@ -269,6 +269,10 @@ def run_agent(messages: list) -> tuple:
                 tool_name  = tool_call.function.name
                 tool_input = json.loads(tool_call.function.arguments)
 
+                # Fix type coercion — AI sometimes passes ints as strings
+                if "limit" in tool_input:
+                    tool_input["limit"] = int(tool_input["limit"])
+
                 # Run the tool (pass pdf_store so create_pdf can fill it)
                 tool_result = execute_tool(tool_name, tool_input, pdf_store)
 

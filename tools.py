@@ -8,6 +8,7 @@ def search_remote_jobs(keywords: str, category: str = "", limit: int = 5) -> dic
     Search remote jobs using Remotive API (Free, no API key needed)
     """
     try:
+        limit = int(limit)  # Force to int in case AI passes a string
         url = "https://remotive.com/api/remote-jobs"
         params = {"search": keywords, "limit": limit}
         if category:
@@ -45,6 +46,7 @@ def search_remoteok_jobs(tag: str, limit: int = 5) -> dict:
     Search remote jobs using RemoteOK API (Free, no API key needed)
     """
     try:
+        limit = int(limit)  # Force to int in case AI passes a string
         url = f"https://remoteok.com/api?tag={tag}"
         headers = {"User-Agent": "RemoteJobFinderBot/1.0"}
         response = requests.get(url, headers=headers, timeout=10)
