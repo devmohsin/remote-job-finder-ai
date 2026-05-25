@@ -23,17 +23,16 @@ try:
 except ImportError:
     DOCX_SUPPORTED = False
 
-# Load environment variables (.env for local, Streamlit secrets for cloud)
 load_dotenv()
 
-# ─── Load API Key Automatically ───────────────────────────────────────────────
+# ─── Load API Key ──────────────────────────────────────────────────────────────
 try:
     if "GROQ_API_KEY" in st.secrets:
         os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 except Exception:
     pass
 
-# ─── CV Text Extraction ───────────────────────────────────────────────────────
+# ─── CV Extractor ─────────────────────────────────────────────────────────────
 def extract_text_from_file(uploaded_file) -> str:
     file_type = uploaded_file.name.split(".")[-1].lower()
     try:
@@ -52,92 +51,57 @@ def extract_text_from_file(uploaded_file) -> str:
             if not DOCX_SUPPORTED:
                 return "DOCX_NOT_SUPPORTED"
             doc = docx.Document(io.BytesIO(uploaded_file.read()))
-            text = "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
-            return text.strip()
+            return "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
         elif file_type == "txt":
             return uploaded_file.read().decode("utf-8").strip()
-        else:
-            return ""
     except Exception:
         return ""
+    return ""
 
 # ─── Page Config ──────────────────────────────────────────────────────────────
-st.set_page_config(
-    page_title="Remote Job Finder AI",
-    page_icon="🌍",
-    layout="centered"
-)
+st.set_page_config(page_title="Remote Job Finder AI", page_icon="🌍", layout="centered")
 
-# ─── Custom CSS ───────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-    .main-header { text-align: center; padding: 1rem 0; }
-    .feature-card {
-        background: #f0f2f6; border-radius: 10px;
-        padding: 0.8rem; margin: 0.3rem 0;
-    }
-    .score-box {
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        color: white; border-radius: 12px;
-        padding: 1rem; text-align: center; margin: 0.5rem 0;
-    }
-    .progress-bar {
-        background: #e0e0e0; border-radius: 10px;
-        height: 12px; margin: 0.5rem 0;
-    }
-    .progress-fill {
-        background: linear-gradient(90deg, #667eea, #764ba2);
-        height: 12px; border-radius: 10px;
-    }
+    .main-header { text-align: center; padding: 0.5rem 0 1rem 0; }
+    .feature-card { background:#f0f2f6; border-radius:10px; padding:0.8rem; margin:0.3rem 0; }
 </style>
 """, unsafe_allow_html=True)
 
-# ─── Header ───────────────────────────────────────────────────────────────────
-st.markdown("""
-<div class="main-header">
-    <h1>🌍 Remote Job Finder AI</h1>
-    <p>Your personal AI assistant for finding remote jobs worldwide</p>
-</div>
-""", unsafe_allow_html=True)
+# ─── Session State Init ───────────────────────────────────────────────────────
+defaults = {
+    "messages": [], "chat_history": [], "cv_text": None,
+    "interview_active": False, "interview_job": "", "interview_history": [],
+    "interview_messages": [], "interview_q_count": 0, "interview_scores": [],
+    "interview_qa_pairs": [], "interview_finished": False,
+    "interview_report": None, "interview_pdf": None, "last_question": ""
+}
+for k, v in defaults.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
 
-# ─── Tabs ─────────────────────────────────────────────────────────────────────
-tab1, tab2 = st.tabs(["🔍 Job Finder", "🎤 Mock Interview"])
+# ─── Sidebar ──────────────────────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("## 🌍 Remote Job Finder AI")
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 1 — JOB FINDER
-# ══════════════════════════════════════════════════════════════════════════════
-with tab1:
+    # Mode selector
+    mode = st.radio(
+        "Select Mode",
+        ["🔍 Job Finder", "🎤 Mock Interview"],
+        label_visibility="collapsed"
+    )
+    st.session_state.mode = mode
+    st.divider()
 
-    # Sidebar
-    with st.sidebar:
+    if mode == "🔍 Job Finder":
         st.header("🚀 What I Can Do")
-        features = [
-            "🔍 Search remote jobs worldwide",
-            "📝 Review your CV/Resume",
-            "✉️ Write cover letters",
-            "💡 Give career advice",
-            "🎯 Match jobs to your skills",
-            "🎤 Mock Interview practice"
-        ]
-        for f in features:
+        for f in ["🔍 Search remote jobs worldwide", "📝 Review your CV/Resume",
+                  "✉️ Write cover letters", "💡 Give career advice", "🎯 Match jobs to your skills"]:
             st.markdown(f'<div class="feature-card">{f}</div>', unsafe_allow_html=True)
 
         st.divider()
-        st.header("💬 Quick Start")
-        st.markdown("""
-        Try saying:
-        - *"Find Python developer jobs"*
-        - *"I am a graphic designer, 3 years experience"*
-        - *"Review my CV"*
-        - *"Write a cover letter for Shopify"*
-        """)
-
-        st.divider()
         st.header("📄 Upload Your CV")
-        uploaded_cv = st.file_uploader(
-            "Upload CV (PDF, Word or TXT)",
-            type=["pdf", "docx", "txt"]
-        )
+        uploaded_cv = st.file_uploader("Upload CV (PDF, Word or TXT)", type=["pdf", "docx", "txt"])
         if uploaded_cv:
             file_size_mb = uploaded_cv.size / (1024 * 1024)
             if file_size_mb > 10:
@@ -146,29 +110,56 @@ with tab1:
                 with st.spinner("Reading your CV..."):
                     cv_text = extract_text_from_file(uploaded_cv)
                 if cv_text == "DOCX_NOT_SUPPORTED":
-                    st.warning("⚠️ Word format not available. Try PDF or TXT.")
+                    st.warning("⚠️ Word not available. Try PDF or TXT.")
                 elif cv_text:
                     st.session_state.cv_text = cv_text
                     st.success(f"✅ CV read! ({len(cv_text.split())} words)")
                     with st.expander("👁️ Preview"):
                         st.text(cv_text[:500] + "..." if len(cv_text) > 500 else cv_text)
                 else:
-                    st.error("❌ Could not read file. Try PDF or TXT.")
+                    st.error("❌ Could not read file.")
 
+        st.divider()
         if st.button("🗑️ Clear Chat", use_container_width=True):
             st.session_state.messages = []
             st.session_state.chat_history = []
             st.rerun()
 
-    # Session state
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
-    if "cv_text" not in st.session_state:
-        st.session_state.cv_text = None
+    else:
+        st.header("🎤 Mock Interview")
+        st.markdown("Practice interviews with AI and get a full performance report.")
+        st.divider()
+        st.markdown("**📋 Format**\n- 6 questions\n- Mix behavioral & technical")
+        st.markdown("**🎯 Scoring**\n- Each answer: 0–10\n- Instant feedback")
+        st.markdown("**📥 Output**\n- Full PDF report\n- Strengths & tips")
+        if st.session_state.interview_active:
+            st.divider()
+            if st.button("🛑 End Interview", use_container_width=True):
+                for k in ["interview_active","interview_history","interview_messages",
+                          "interview_q_count","interview_scores","interview_qa_pairs",
+                          "interview_finished","interview_report","interview_pdf","last_question"]:
+                    st.session_state[k] = [] if isinstance(st.session_state[k], list) else \
+                                          False if isinstance(st.session_state[k], bool) else \
+                                          0 if isinstance(st.session_state[k], int) else \
+                                          None if st.session_state[k] is None else ""
+                st.session_state.interview_active = False
+                st.rerun()
 
-    # Welcome message
+# ══════════════════════════════════════════════════════════════════════════════
+# MAIN CONTENT AREA
+# ══════════════════════════════════════════════════════════════════════════════
+st.markdown("""
+<div class="main-header">
+    <h1>🌍 Remote Job Finder AI</h1>
+    <p>Your personal AI assistant for finding remote jobs worldwide</p>
+</div>
+""", unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MODE 1 — JOB FINDER
+# ══════════════════════════════════════════════════════════════════════════════
+if mode == "🔍 Job Finder":
+
     if not st.session_state.chat_history:
         with st.chat_message("assistant"):
             st.markdown("""
@@ -178,7 +169,7 @@ I can help you:
 - 🔍 **Find remote jobs** that match your skills
 - 📝 **Review your CV** and suggest improvements
 - ✉️ **Write cover letters** for specific jobs
-- 🎤 **Practice interviews** — go to the Mock Interview tab!
+- 💡 **Give career advice** for remote work
 
 **To get started, tell me:**
 - What is your profession or skill set?
@@ -188,13 +179,12 @@ I can help you:
 Let's get you hired! 🚀
             """)
 
-    # Chat history
     for chat in st.session_state.chat_history:
         with st.chat_message(chat["role"]):
             st.markdown(chat["content"])
 
-    # Chat input
-    user_input = st.chat_input("Type here... e.g. 'Find Python developer jobs'", key="job_finder_input")
+    # ── Single chat_input at bottom ───────────────────────────────────────────
+    user_input = st.chat_input("Type here... e.g. 'Find Python developer jobs'")
 
     if user_input:
         if not os.environ.get("GROQ_API_KEY"):
@@ -203,10 +193,9 @@ Let's get you hired! 🚀
 
         full_input = user_input
         if st.session_state.cv_text:
-            cv_keywords = ["cv", "resume", "review", "check", "improve",
-                           "analyze", "analyse", "feedback", "suggest",
-                           "look at", "read", "fix", "update", "score",
-                           "rate", "help", "better", "profile"]
+            cv_keywords = ["cv","resume","review","check","improve","analyze",
+                           "analyse","feedback","suggest","look at","read","fix",
+                           "update","score","rate","help","better","profile"]
             if any(w in user_input.lower() for w in cv_keywords):
                 full_input = f"{user_input}\n\n[Attached CV/Resume:]\n{st.session_state.cv_text}"
 
@@ -220,59 +209,34 @@ Let's get you hired! 🚀
                 try:
                     response, pdf_bytes, pdf_filename = run_agent(st.session_state.messages)
                     st.markdown(response)
-
                     if pdf_bytes:
-                        st.download_button(
-                            label="📥 Download PDF",
-                            data=pdf_bytes,
-                            file_name=pdf_filename,
-                            mime="application/pdf",
-                            use_container_width=True
-                        )
-
+                        st.download_button("📥 Download PDF", pdf_bytes,
+                                           pdf_filename, "application/pdf",
+                                           use_container_width=True)
                     st.session_state.chat_history.append({"role": "assistant", "content": response})
                     st.session_state.messages.append({"role": "assistant", "content": response})
-
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
 
-
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 2 — MOCK INTERVIEW
+# MODE 2 — MOCK INTERVIEW
 # ══════════════════════════════════════════════════════════════════════════════
-with tab2:
+else:
 
-    # ── Interview session state ──────────────────────────────────────────────
-    if "interview_active"    not in st.session_state: st.session_state.interview_active    = False
-    if "interview_job"       not in st.session_state: st.session_state.interview_job       = ""
-    if "interview_history"   not in st.session_state: st.session_state.interview_history   = []
-    if "interview_messages"  not in st.session_state: st.session_state.interview_messages  = []
-    if "interview_q_count"   not in st.session_state: st.session_state.interview_q_count   = 0
-    if "interview_scores"    not in st.session_state: st.session_state.interview_scores    = []
-    if "interview_qa_pairs"  not in st.session_state: st.session_state.interview_qa_pairs  = []
-    if "interview_finished"  not in st.session_state: st.session_state.interview_finished  = False
-    if "interview_report"    not in st.session_state: st.session_state.interview_report    = None
-    if "interview_pdf"       not in st.session_state: st.session_state.interview_pdf       = None
-    if "last_question"       not in st.session_state: st.session_state.last_question       = ""
-
-    # ── START SCREEN ────────────────────────────────────────────────────────
+    # ── START SCREEN ──────────────────────────────────────────────────────────
     if not st.session_state.interview_active:
         st.markdown("## 🎤 AI Mock Interview")
-        st.markdown("Practice your interview skills with an AI interviewer. Get scored on each answer and receive a detailed report at the end.")
+        st.markdown("Practice your interview skills and get a detailed performance report with scoring.")
 
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            job_title = st.text_input(
-                "Enter the job you are interviewing for:",
-                placeholder="e.g. Python Developer, Graphic Designer, Marketing Manager"
-            )
-        with col2:
-            st.markdown("<br>", unsafe_allow_html=True)
-            start_btn = st.button("🚀 Start Interview", use_container_width=True, type="primary")
+        job_title = st.text_input(
+            "Enter the job you are interviewing for:",
+            placeholder="e.g. Python Developer, Graphic Designer, Marketing Manager"
+        )
+        start_btn = st.button("🚀 Start Interview", type="primary", use_container_width=True)
 
         if start_btn and job_title:
             if not os.environ.get("GROQ_API_KEY"):
-                st.error("⚠️ Service unavailable. Please try again later.")
+                st.error("⚠️ Service unavailable.")
             else:
                 with st.spinner("Preparing your interview..."):
                     first_q = get_first_question(job_title)
@@ -283,143 +247,102 @@ with tab2:
                     st.session_state.interview_history  = [{"role": "assistant", "content": first_q}]
                     st.session_state.interview_messages = [{"role": "assistant", "content": first_q}]
                 st.rerun()
+        elif start_btn:
+            st.warning("⚠️ Please enter a job title.")
 
-        elif start_btn and not job_title:
-            st.warning("⚠️ Please enter a job title to start the interview.")
-
-        # Info cards
         st.markdown("---")
         c1, c2, c3 = st.columns(3)
-        with c1:
-            st.markdown("### 📋 Format\n- 6 questions\n- One at a time\n- Mix of behavioral & technical")
-        with c2:
-            st.markdown("### 🎯 Scoring\n- Each answer: 0-10\n- Instant feedback\n- Final report")
-        with c3:
-            st.markdown("### 📥 Output\n- Detailed PDF report\n- Strengths & weaknesses\n- Tips to improve")
+        with c1: st.markdown("### 📋 Format\n- 6 questions\n- One at a time\n- Behavioral & technical")
+        with c2: st.markdown("### 🎯 Scoring\n- Each answer: 0-10\n- Instant feedback\n- Final score")
+        with c3: st.markdown("### 📥 Output\n- Full PDF report\n- Strengths & gaps\n- Improvement tips")
 
-    # ── ACTIVE INTERVIEW ────────────────────────────────────────────────────
+    # ── ACTIVE INTERVIEW ──────────────────────────────────────────────────────
     else:
-        job = st.session_state.interview_job
+        job     = st.session_state.interview_job
+        scores  = st.session_state.interview_scores
         q_count = st.session_state.interview_q_count
-        scores = st.session_state.interview_scores
+        avg     = round(sum(scores)/len(scores), 1) if scores else 0
 
-        # Progress bar
-        progress = min(q_count - 1, TOTAL_QUESTIONS) / TOTAL_QUESTIONS
-        avg_score = round(sum(scores) / len(scores), 1) if scores else 0
-
-        col1, col2, col3 = st.columns([2, 1, 1])
+        col1, col2 = st.columns([3, 1])
         with col1:
-            st.progress(progress, text=f"Question {min(q_count, TOTAL_QUESTIONS)} of {TOTAL_QUESTIONS}")
+            st.progress(min(q_count-1, TOTAL_QUESTIONS)/TOTAL_QUESTIONS,
+                        text=f"Question {min(q_count, TOTAL_QUESTIONS)} of {TOTAL_QUESTIONS}")
         with col2:
-            st.metric("Avg Score", f"{avg_score}/10" if scores else "—")
-        with col3:
-            if st.button("🛑 End Interview", use_container_width=True):
-                st.session_state.interview_active   = False
-                st.session_state.interview_history  = []
-                st.session_state.interview_messages = []
-                st.session_state.interview_q_count  = 0
-                st.session_state.interview_scores   = []
-                st.session_state.interview_qa_pairs = []
-                st.session_state.interview_finished = False
-                st.session_state.interview_report   = None
-                st.session_state.interview_pdf      = None
-                st.session_state.last_question      = ""
-                st.rerun()
+            st.metric("Avg Score", f"{avg}/10" if scores else "—")
 
         st.markdown(f"**🎯 Interviewing for: {job}**")
         st.divider()
 
-        # Show report if finished
+        # Final report
         if st.session_state.interview_finished and st.session_state.interview_report:
             st.success("🎉 Interview Complete! Here is your performance report:")
             st.markdown(st.session_state.interview_report)
             if st.session_state.interview_pdf:
                 st.download_button(
-                    label="📥 Download Full Report as PDF",
-                    data=st.session_state.interview_pdf,
-                    file_name=f"interview_report_{job.replace(' ', '_')}.pdf",
-                    mime="application/pdf",
-                    use_container_width=True
+                    "📥 Download Full Report as PDF",
+                    st.session_state.interview_pdf,
+                    f"interview_report_{job.replace(' ','_')}.pdf",
+                    "application/pdf", use_container_width=True
                 )
         else:
             # Chat history
             for msg in st.session_state.interview_history:
-                role = msg["role"]
-                with st.chat_message(role):
+                with st.chat_message(msg["role"]):
                     content = msg["content"]
-                    # Highlight SCORE line
                     if "SCORE:" in content:
-                        lines = content.split("\n")
-                        for line in lines:
+                        for line in content.split("\n"):
                             if line.startswith("SCORE:"):
-                                score_val = line.replace("SCORE:", "").strip()
                                 st.markdown(f"**🏆 {line}**")
                             elif line.startswith("FEEDBACK:"):
                                 st.markdown(f"💬 {line}")
-                            else:
-                                if line.strip():
-                                    st.markdown(line)
+                            elif line.strip():
+                                st.markdown(line)
                     else:
                         st.markdown(content)
 
-            # Answer input
-            if not st.session_state.interview_finished:
-                answer = st.chat_input("Type your answer here...", key="interview_input")
-
-                if answer:
-                    if not os.environ.get("GROQ_API_KEY"):
-                        st.error("⚠️ Service unavailable.")
-                        st.stop()
-
-                    # Show user answer
-                    st.session_state.interview_history.append({"role": "user", "content": answer})
-                    st.session_state.interview_messages.append({"role": "user", "content": answer})
-
-                    # Store Q&A pair
-                    st.session_state.interview_qa_pairs.append({
-                        "question": st.session_state.last_question,
-                        "answer": answer
-                    })
-
-                    with st.spinner("🤔 Evaluating your answer..."):
-                        try:
-                            response, is_finished = continue_interview(
-                                job,
-                                st.session_state.interview_messages,
-                                st.session_state.interview_q_count
-                            )
-
-                            # Extract score and save
-                            score = extract_score(response)
-                            feedback = extract_feedback(response)
-                            if score > 0:
-                                st.session_state.interview_scores.append(score)
-                                if st.session_state.interview_qa_pairs:
-                                    st.session_state.interview_qa_pairs[-1]["score"] = score
-                                    st.session_state.interview_qa_pairs[-1]["feedback"] = feedback
-
-                            st.session_state.interview_history.append({"role": "assistant", "content": response})
-                            st.session_state.interview_messages.append({"role": "assistant", "content": response})
-                            st.session_state.last_question = response
-                            st.session_state.interview_q_count += 1
-
-                            if is_finished:
-                                st.session_state.interview_finished = True
-
-                        except Exception as e:
-                            st.error(f"❌ Error: {str(e)}")
-
-                    st.rerun()
-
-            # Generate report when finished
+            # Generate report if finished but not yet generated
             if st.session_state.interview_finished and not st.session_state.interview_report:
                 with st.spinner("📊 Generating your performance report..."):
                     try:
                         report_text, pdf_bytes = generate_interview_report(
-                            job, st.session_state.interview_qa_pairs
-                        )
+                            job, st.session_state.interview_qa_pairs)
                         st.session_state.interview_report = report_text
                         st.session_state.interview_pdf    = pdf_bytes
                     except Exception as e:
                         st.error(f"❌ Report error: {str(e)}")
                 st.rerun()
+
+            # ── Single chat_input at bottom ───────────────────────────────────
+            if not st.session_state.interview_finished:
+                answer = st.chat_input("Type your answer here...")
+                if answer:
+                    if not os.environ.get("GROQ_API_KEY"):
+                        st.error("⚠️ Service unavailable.")
+                        st.stop()
+
+                    st.session_state.interview_history.append({"role": "user", "content": answer})
+                    st.session_state.interview_messages.append({"role": "user", "content": answer})
+                    st.session_state.interview_qa_pairs.append({
+                        "question": st.session_state.last_question, "answer": answer
+                    })
+
+                    with st.spinner("🤔 Evaluating your answer..."):
+                        try:
+                            response, is_finished = continue_interview(
+                                job, st.session_state.interview_messages,
+                                st.session_state.interview_q_count)
+                            score    = extract_score(response)
+                            feedback = extract_feedback(response)
+                            if score > 0:
+                                st.session_state.interview_scores.append(score)
+                                st.session_state.interview_qa_pairs[-1]["score"]    = score
+                                st.session_state.interview_qa_pairs[-1]["feedback"] = feedback
+                            st.session_state.interview_history.append({"role": "assistant", "content": response})
+                            st.session_state.interview_messages.append({"role": "assistant", "content": response})
+                            st.session_state.last_question   = response
+                            st.session_state.interview_q_count += 1
+                            if is_finished:
+                                st.session_state.interview_finished = True
+                        except Exception as e:
+                            st.error(f"❌ Error: {str(e)}")
+                    st.rerun()
