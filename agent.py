@@ -4,8 +4,8 @@ from groq import Groq
 from pdf_generator import generate_pdf
 from tools import search_remote_jobs, search_remoteok_jobs, review_cv, write_cover_letter, get_job_categories
 
-# Model to use (free on Groq)
-MODEL = "llama-3.3-70b-versatile"
+# Model specifically trained for tool/function calling
+MODEL = "llama3-groq-70b-8192-tool-use-preview"
 
 # System prompt
 SYSTEM_PROMPT = """You are RemoteJobBot, a helpful AI assistant that specializes in helping people find remote jobs worldwide.
