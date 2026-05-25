@@ -55,7 +55,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "search_remote_jobs",
-            "description": "Search for remote job listings using keywords. Use this when the user wants to find remote jobs. Returns job title, company, salary, location, and apply link.",
+            "description": "Search for remote job listings using keywords. Use this when the user wants to find remote jobs. Returns job title, company, salary, location, and apply link. Always returns 5 results.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -66,10 +66,6 @@ TOOLS = [
                     "category": {
                         "type": "string",
                         "description": "Job category filter (optional) e.g. 'software-dev', 'design', 'marketing'"
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Number of jobs to return (default 5, max 10)"
                     }
                 },
                 "required": ["keywords"]
@@ -80,17 +76,13 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "search_remoteok_jobs",
-            "description": "Search RemoteOK platform for remote jobs by tag/skill. Good for tech and developer jobs.",
+            "description": "Search RemoteOK platform for remote jobs by tag/skill. Good for tech and developer jobs. Always returns 5 results.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "tag": {
                         "type": "string",
                         "description": "Skill or technology tag e.g. 'python', 'react', 'design', 'marketing'"
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Number of jobs to return (default 5)"
                     }
                 },
                 "required": ["tag"]
@@ -269,9 +261,12 @@ def run_agent(messages: list) -> tuple:
                 tool_name  = tool_call.function.name
                 tool_input = json.loads(tool_call.function.arguments)
 
-                # Fix type coercion — AI sometimes passes ints as strings
+                # Safety: coerce limit to int if AI still passes it
                 if "limit" in tool_input:
-                    tool_input["limit"] = int(tool_input["limit"])
+                    try:
+                        tool_input["limit"] = int(tool_input["limit"])
+                    except (ValueError, TypeError):
+                        tool_input.pop("limit")
 
                 # Run the tool (pass pdf_store so create_pdf can fill it)
                 tool_result = execute_tool(tool_name, tool_input, pdf_store)
