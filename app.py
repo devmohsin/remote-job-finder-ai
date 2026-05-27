@@ -3,11 +3,49 @@ import os
 import io
 from dotenv import load_dotenv
 from agent import run_agent
+from tools import search_remote_jobs
 from interview_agent import (
     get_first_question, continue_interview,
     generate_interview_report, extract_score, extract_feedback,
     TOTAL_QUESTIONS
 )
+
+# ─── Job Search Intent Detection ──────────────────────────────────────────────
+JOB_KEYWORDS = [
+    "find", "search", "looking for", "job", "jobs", "work",
+    "position", "role", "vacancy", "hiring", "remote job",
+    "developer", "designer", "engineer", "manager", "analyst",
+    "marketer", "writer", "support", "sales", "recruiter"
+]
+
+def detect_job_search(text: str) -> str | None:
+    """Return extracted job keywords if user is searching for jobs, else None"""
+    text_lower = text.lower()
+    if any(kw in text_lower for kw in JOB_KEYWORDS):
+        # Extract meaningful keywords — strip filler words
+        stopwords = {"find","me","i","a","for","some","please","can","you",
+                     "want","need","looking","search","show","get","remote",
+                     "job","jobs","work","position","roles","any","good"}
+        words = [w for w in text_lower.split() if w not in stopwords]
+        return " ".join(words[:5]) if words else text_lower
+    return None
+
+def fetch_jobs_context(keywords: str) -> str:
+    """Call job API and format results as context string for the agent"""
+    result = search_remote_jobs(keywords=keywords, limit=5)
+    if not result.get("success") or not result.get("jobs"):
+        return f"No jobs found for '{keywords}'. Try different keywords."
+
+    lines = [f"Here are the latest remote jobs for '{keywords}':\n"]
+    for i, job in enumerate(result["jobs"], 1):
+        lines.append(
+            f"{i}. {job['title']} — {job['company']}\n"
+            f"   💰 Salary: {job.get('salary','Not specified')}\n"
+            f"   📍 Location: {job.get('location','Remote')}\n"
+            f"   📅 Posted: {job.get('posted_date','')}\n"
+            f"   🔗 Apply: {job.get('url','N/A')}\n"
+        )
+    return "\n".join(lines)
 
 # Safe import for pdfplumber
 try:
@@ -192,12 +230,21 @@ Let's get you hired! 🚀
             st.stop()
 
         full_input = user_input
+
+        # Inject CV if CV-related message
         if st.session_state.cv_text:
             cv_keywords = ["cv","resume","review","check","improve","analyze",
                            "analyse","feedback","suggest","look at","read","fix",
                            "update","score","rate","help","better","profile"]
             if any(w in user_input.lower() for w in cv_keywords):
                 full_input = f"{user_input}\n\n[Attached CV/Resume:]\n{st.session_state.cv_text}"
+
+        # Inject job search results if job-related message
+        job_keywords = detect_job_search(user_input)
+        if job_keywords:
+            with st.spinner("🔍 Searching jobs..."):
+                jobs_context = fetch_jobs_context(job_keywords)
+            full_input = f"{user_input}\n\n[Job Search Results:]\n{jobs_context}"
 
         with st.chat_message("user"):
             st.markdown(user_input)

@@ -1,266 +1,76 @@
-import json
 import os
 from groq import Groq
-from pdf_generator import generate_pdf
-from tools import search_remote_jobs, search_remoteok_jobs, review_cv, write_cover_letter, get_job_categories
 
-# Model specifically trained for tool/function calling
 MODEL = "llama-3.3-70b-versatile"
 
-# System prompt
 SYSTEM_PROMPT = """You are RemoteJobBot, a helpful AI assistant that specializes in helping people find remote jobs worldwide.
 
 You help users with:
-1. Searching for remote jobs based on their skills and experience
+1. Presenting remote job search results in a clear, friendly format
 2. Reviewing and improving their CV/Resume
 3. Writing professional cover letters
 4. Giving career advice for remote work
 
-Your personality:
-- Friendly, encouraging, and professional
-- Always ask clarifying questions to find the best jobs for the user
-- Celebrate when you find great job matches
-- Give honest, constructive feedback on CVs
-
-When searching for jobs:
-- Always ask about their skills, experience level, and expected salary if not provided
-- Search using multiple keywords for better results
-- Present jobs in a clear, easy-to-read format
-- Always include the apply link
+When job results are provided to you in the message, present them in this format for each job:
+**[Job Number]. Job Title — Company**
+💰 Salary: ...
+📍 Location: ...
+🔗 Apply: [URL]
 
 When reviewing CVs:
+- Give a score out of 100
+- List strengths
+- List specific improvements
 - Be encouraging but honest
-- Give specific, actionable suggestions
-- Focus on what will help them get hired faster
 
 When writing cover letters:
-- Write the FULL cover letter directly in your response as plain text
-- Do NOT mention any PDF link or URL
-- Do NOT say "here is your CV in PDF format"
-- Do NOT generate or mention any download links
-- Just write the complete cover letter text — the app handles PDF download automatically
+- Write the FULL cover letter as plain text
+- Do NOT mention any PDF links or URLs
+- Keep it professional and personalized
 
-IMPORTANT RULES — NEVER break these:
+IMPORTANT RULES:
 - NEVER generate fake URLs or links
-- NEVER say "here is your PDF at https://..."
-- NEVER mention fictional download links
-- NEVER say a PDF has been created or sent
-- PDF download is handled automatically by the app — you only need to write the content as plain text
+- NEVER say a PDF has been created
+- NEVER invent job listings — only present jobs given to you in the context
 
-Always respond in a friendly, conversational tone. Use emojis occasionally to keep things engaging. 🚀"""
-
-# Define tools (Groq uses OpenAI-compatible format)
-TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "search_remote_jobs",
-            "description": "Search for remote job listings using keywords. Use this when the user wants to find remote jobs. Returns job title, company, salary, location, and apply link.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "keywords": {
-                        "type": "string",
-                        "description": "Job search keywords e.g. 'wordpress developer', 'graphic designer', 'customer support'"
-                    }
-                },
-                "required": ["keywords"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "review_cv",
-            "description": "Review and analyze a user's CV/Resume text. Gives a score, identifies issues, and provides improvement suggestions.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "cv_text": {
-                        "type": "string",
-                        "description": "The full text content of the user's CV/Resume"
-                    }
-                },
-                "required": ["cv_text"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "write_cover_letter",
-            "description": "Write a professional cover letter for a specific job application.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "job_title": {
-                        "type": "string",
-                        "description": "The job title they are applying for"
-                    },
-                    "company_name": {
-                        "type": "string",
-                        "description": "The name of the company"
-                    },
-                    "candidate_skills": {
-                        "type": "string",
-                        "description": "The candidate's main skills and expertise"
-                    },
-                    "years_experience": {
-                        "type": "string",
-                        "description": "Years of experience e.g. '3 years', '5+ years'"
-                    }
-                },
-                "required": ["job_title", "company_name", "candidate_skills", "years_experience"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_job_categories",
-            "description": "Get a list of popular remote job categories. Use this when the user is unsure what category to search in.",
-            "parameters": {
-                "type": "object",
-                "properties": {}
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "create_pdf",
-            "description": "Create and generate a downloadable PDF file with any content. Use this whenever the user asks to create a PDF, generate a PDF, download something as PDF, or save content to PDF.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "title": {
-                        "type": "string",
-                        "description": "The title of the PDF document e.g. 'Cover Letter', 'CV Review', 'Hello World'"
-                    },
-                    "content": {
-                        "type": "string",
-                        "description": "The full content/body text to include in the PDF"
-                    },
-                    "filename": {
-                        "type": "string",
-                        "description": "The filename for the PDF e.g. 'cover_letter.pdf', 'hello_world.pdf'"
-                    }
-                },
-                "required": ["title", "content"]
-            }
-        }
-    }
-]
-
-
-def execute_tool(tool_name: str, tool_input: dict, pdf_store: dict) -> str:
-    """Execute the requested tool and return result as string"""
-    try:
-        if tool_name == "search_remote_jobs":
-            result = search_remote_jobs(**tool_input)
-        elif tool_name == "search_remoteok_jobs":
-            # Fallback: use search_remote_jobs with tag as keyword
-            keywords = tool_input.get("tag", tool_input.get("keywords", "remote jobs"))
-            result = search_remote_jobs(keywords=keywords)
-        elif tool_name == "review_cv":
-            result = review_cv(**tool_input)
-        elif tool_name == "write_cover_letter":
-            result = write_cover_letter(**tool_input)
-        elif tool_name == "get_job_categories":
-            result = get_job_categories()
-        elif tool_name == "create_pdf":
-            # Generate PDF and store bytes directly in pdf_store dict
-            try:
-                title    = tool_input.get("title", "Document")
-                content  = tool_input.get("content", "")
-                filename = tool_input.get("filename", "document.pdf")
-                if not filename.endswith(".pdf"):
-                    filename += ".pdf"
-                pdf_bytes = generate_pdf(title, content)
-                pdf_store["bytes"]    = pdf_bytes
-                pdf_store["filename"] = filename
-                result = {"success": True, "message": f"PDF '{filename}' created! Download button will appear below."}
-            except Exception as e:
-                result = {"success": False, "message": f"PDF creation failed: {str(e)}"}
-        else:
-            result = {"success": False, "message": f"Unknown tool: {tool_name}"}
-
-        return json.dumps(result)
-    except Exception as e:
-        return json.dumps({"success": False, "message": f"Tool error: {str(e)}"})
+Always respond in a friendly, conversational tone. Use emojis occasionally. 🚀"""
 
 
 def run_agent(messages: list) -> tuple:
     """
-    Run the AI agent with the agentic loop
+    Run the AI agent — pure text generation, no tool calling
     Returns (text_response, pdf_bytes, pdf_filename)
     """
-    # Initialize client here so it picks up the API key at runtime
+    from pdf_generator import generate_pdf
+
     client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
-    # PDF store — passed into execute_tool so it can store PDF bytes directly
-    pdf_store = {"bytes": None, "filename": "document.pdf"}
-
-    # Add system message at the start
     full_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
 
-    while True:
-        # Call Groq API
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=full_messages,
-            tools=TOOLS,
-            tool_choice="auto",
-            max_tokens=2048,
-            parallel_tool_calls=False
-        )
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=full_messages,
+        max_tokens=2048
+    )
 
-        message = response.choices[0].message
-        finish_reason = response.choices[0].finish_reason
+    text = response.choices[0].message.content or "Sorry, I could not generate a response."
 
-        # Check if model wants to use a tool
-        if finish_reason == "tool_calls" and message.tool_calls:
+    # Generate PDF if response contains cover letter or CV review
+    pdf_bytes = None
+    pdf_filename = "document.pdf"
+    text_lower = text.lower()
 
-            # Add assistant message with tool calls to history
-            full_messages.append({
-                "role": "assistant",
-                "content": message.content or "",
-                "tool_calls": [
-                    {
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {
-                            "name": tc.function.name,
-                            "arguments": tc.function.arguments
-                        }
-                    }
-                    for tc in message.tool_calls
-                ]
-            })
+    if "dear hiring" in text_lower or "cover letter" in text_lower:
+        try:
+            pdf_bytes = generate_pdf("Cover Letter", text)
+            pdf_filename = "cover_letter.pdf"
+        except Exception:
+            pass
+    elif "score:" in text_lower or "cv review" in text_lower or "resume review" in text_lower:
+        try:
+            pdf_bytes = generate_pdf("CV Review Report", text)
+            pdf_filename = "cv_review.pdf"
+        except Exception:
+            pass
 
-            # Execute each tool call
-            for tool_call in message.tool_calls:
-                tool_name  = tool_call.function.name
-                tool_input = json.loads(tool_call.function.arguments)
-
-                # Safety: coerce limit to int if AI still passes it
-                if "limit" in tool_input:
-                    try:
-                        tool_input["limit"] = int(tool_input["limit"])
-                    except (ValueError, TypeError):
-                        tool_input.pop("limit")
-
-                # Run the tool (pass pdf_store so create_pdf can fill it)
-                tool_result = execute_tool(tool_name, tool_input, pdf_store)
-
-                # Add tool result to messages
-                full_messages.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "content": tool_result
-                })
-
-        else:
-            # Agent is done — return text + any PDF that was generated
-            text = message.content or "Sorry, I could not generate a response. Please try again."
-            return text, pdf_store["bytes"], pdf_store["filename"]
+    return text, pdf_bytes, pdf_filename
