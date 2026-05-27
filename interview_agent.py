@@ -3,7 +3,7 @@ import json
 from groq import Groq
 from pdf_generator import generate_pdf
 
-MODEL = "llama3-groq-70b-8192-tool-use-preview"
+MODEL = "llama-3.3-70b-versatile"
 
 TOTAL_QUESTIONS = 6
 
