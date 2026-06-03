@@ -2,6 +2,8 @@
 
 An AI-powered agent built with **Python** and **Streamlit** that helps people find remote jobs worldwide, review CVs, and write cover letters.
 
+### 🔴 Live Demo → [remote-job-finder.streamlit.app](https://remote-job-finder.streamlit.app/)
+
 ---
 
 ## ✨ Features
